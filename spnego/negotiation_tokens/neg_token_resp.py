@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 from contextlib import suppress
 
-from spnego.negotiation_tokens.base import SPNEGONegotiationToken
+from spnego.negotiation_tokens.base import SPNEGONegotiationToken, register_spnego_class
 from spnego.token_attributes import MechListMic, ResponseToken, SupportedMech, NegTokenRespNegState, NegState, MechType
 
 from asn1.universal_types import Sequence as ASN1Sequence, Enumerated, OctetString
@@ -12,6 +12,7 @@ from asn1.oid import OID
 
 
 @dataclass
+@register_spnego_class
 class NegTokenResp(SPNEGONegotiationToken):
     neg_state: Optional[NegTokenRespNegState] = None
     supported_mech: Optional[OID] = None
@@ -67,6 +68,20 @@ class NegTokenResp(SPNEGONegotiationToken):
 
     @classmethod
     def _from_inner_sequence(cls, inner_sequence: ASN1Sequence) -> NegTokenResp:
+
+        neg_state: Optional[NegTokenRespNegState] = None
+        with suppress(StopIteration):
+            neg_state: Optional[NegTokenRespNegState] = cls._NegState.from_tlv_triplet(
+                tlv_triplet=next(
+                    element
+                    for element in inner_sequence.elements if element.tag == cls._NegState.tag
+                )
+            ).parsed_value
+
+        mech_token: Optional[bytes] = None
+        with suppress(StopIteration):
+
+
 
 
 

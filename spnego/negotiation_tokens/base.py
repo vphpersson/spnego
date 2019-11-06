@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Type, Dict
 from abc import ABC, abstractmethod
 
 from asn1.asn1_type import ASN1Type
@@ -45,6 +45,7 @@ class GSSToken(ASN1Type, ABC):
 class SPNEGONegotiationToken(GSSToken, ABC):
     mechanism_oid: ClassVar[OID] = OID.from_string('1.3.6.1.5.5.2')
     spnego_tag: ClassVar[Tag] = NotImplemented
+    _spnego_tag_to_class: ClassVar[Dict[Tag, Type[SPNEGONegotiationToken]]] = {}
 
     @property
     @abstractmethod
@@ -78,5 +79,11 @@ class SPNEGONegotiationToken(GSSToken, ABC):
                 raise ValueError
             return cls._from_inner_sequence(inner_sequence=inner_sequence)
         else:
-            # TODO: Instantiate using map.
-            ...
+            return cls._spnego_tag_to_class[negotiation_token_tlv_triplet.tag]._from_inner_sequence(
+                inner_sequence=inner_sequence
+            )
+
+
+def register_spnego_class(cls: Type[SPNEGONegotiationToken]) -> Type[SPNEGONegotiationToken]:
+    cls._spnego_tag_to_class[cls.tag] = cls
+    return cls

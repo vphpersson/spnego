@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from typing import ClassVar, List, Optional
 from contextlib import suppress
 
-from spnego.negotiation_tokens.base import SPNEGONegotiationToken
-from spnego.token_attributes import MechTypeList, ReqFlags, MechToken, MechListMic, NegTokenInitReqFlag
+from spnego.negotiation_tokens.base import SPNEGONegotiationToken, register_spnego_class
+from spnego.token_attributes import MechTypeList, ReqFlags, MechToken, MechListMic, NegTokenInitReqFlag, \
+    parse_attribute_elements
 
 from asn1.universal_types import Sequence as ASN1Sequence, OctetString, ObjectIdentifier, BitString
 from asn1.tag_length_value_triplet import Tag, TagLengthValueTriplet
@@ -12,6 +13,7 @@ from asn1.oid import OID
 
 
 @dataclass
+@register_spnego_class
 class NegTokenInit(SPNEGONegotiationToken):
     mech_types: List[OID]
     req_flags: Optional[NegTokenInitReqFlag] = None
@@ -22,6 +24,7 @@ class NegTokenInit(SPNEGONegotiationToken):
 
     class _MechTypeList(MechTypeList):
         tag = Tag.from_bytes(data=b'\xa0')
+        required = True
 
     class _ReqFlags(ReqFlags):
         tag = Tag.from_bytes(data=b'\xa1')
@@ -65,7 +68,11 @@ class NegTokenInit(SPNEGONegotiationToken):
     @classmethod
     def _from_inner_sequence(cls, inner_sequence: ASN1Sequence) -> NegTokenInit:
 
-        # TODO: Check order (i.e. verify list is sorted?)
+        parse_attribute_elements(
+            token_inner_elements=inner_sequence.elements,
+            valid_tags={},
+            required_tags=
+        )
 
         req_flags: Optional[NegTokenInitReqFlag] = None
         with suppress(StopIteration):

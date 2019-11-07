@@ -36,12 +36,14 @@ class GSSToken(ASN1Type, ABC):
         if sequence.elements[0].tag != ASN1UniversalTag.OBJECT_IDENTIFIER.value:
             raise InvalidGSSTokenTagError(observed_tag=sequence.elements[0].tag)
 
+        # TODO: It is strange that a sequence is returned, having an incorrect tag value.
         return sequence
 
     def tlv_triplet(self) -> TagLengthValueTriplet:
-        return ASN1Sequence(
-            elements=(ObjectIdentifier(oid=self.mechanism_oid).tlv_triplet(), self.negotiation_token_tlv_triplet,)
-        ).tlv_triplet()
+        return TagLengthValueTriplet(
+            tag=self.tag,
+            value=bytes(ObjectIdentifier(oid=self.mechanism_oid)) + bytes(self.negotiation_token_tlv_triplet)
+        )
 
 
 @dataclass
@@ -55,6 +57,7 @@ class SPNEGONegotiationToken(GSSToken, ABC):
     def _inner_sequence(self) -> ASN1Sequence:
         raise NotImplementedError
 
+    @property
     def negotiation_token_tlv_triplet(self) -> TagLengthValueTriplet:
         return TagLengthValueTriplet(tag=self.spnego_tag, value=bytes(self._inner_sequence))
 

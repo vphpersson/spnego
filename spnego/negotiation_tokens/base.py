@@ -60,16 +60,37 @@ class SPNEGONegotiationToken(GSSToken, ABC):
 
     @classmethod
     def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet):
+        """
+        Instantiate a negotiate token from a TLV triplet.
+
+        This method is called via the `ASN1Type.from_tlv_triplet` method. If it is called with this class, i.e.
+        `SPNEGONegotiationToken.from_tlv_triplet`, this method will instantiate a negotiation token of the appropriate
+        class by looking up the class with the provided TLV triplet's tag. If it is called with a child class, e.g.
+        `NegTokenInit.from_tlv_triplet`, the appropriate class is chosen via the `cls` argument.
+
+        If the method is called with a child class, a check is made to assure that the provided TLV triplet is of the
+        correct format by comparing the TLV triplets tag with the chosen `cls` class' `spnego_tag`.
+
+        The `_spnego_tag_to_class` dict is populated via a class decorator that registers the corresponding class'
+        tag and class as key and value.
+
+        :param tlv_triplet: A TLV triplet corresponding to a negotiation token.
+        :return: An instance of the negotiate token class corresponding to the TLV triplet's tag.
+        """
 
         # Import the negotiate token classes to enable the population of the `_spnego_tag_to_class` dict.
         from spnego.negotiation_tokens.neg_token_init import NegTokenInit
         from spnego.negotiation_tokens.neg_token_resp import NegTokenResp
+
+        # Verify that the GSS token part is conformant.
 
         gss_token_sequence: ASN1Sequence = super()._from_tlv_triplet(tlv_triplet=tlv_triplet)
         observed_mechanism_oid: OID = ObjectIdentifier.from_tlv_triplet(tlv_triplet=gss_token_sequence.elements[0]).oid
 
         if observed_mechanism_oid != cls.mechanism_oid:
             raise NegotiationTokenOidMismatchError(observed_oid=observed_mechanism_oid)
+
+        # Instantiate a negotiation token instance.
 
         negotiation_token_tlv_triplet: TagLengthValueTriplet = gss_token_sequence.elements[1]
         inner_sequence = ASN1Sequence.from_tlv_triplet(

@@ -1,3 +1,11 @@
+"""
+Attributes of negotiate tokens.
+
+Each attribute class is abstract, because an attribute class' `tag` value is determined by its relative position in a
+token's set of attributes. Thus, to utilize the attribute classes, they must be inherited from and a `tag` value must
+be added and set to its appropriate value.
+"""
+
 from dataclasses import dataclass
 from typing import List, Any, ClassVar
 from enum import IntEnum
@@ -31,7 +39,9 @@ class MechType(ObjectIdentifier):
 
 @dataclass
 class TokenAttribute(ASN1Sequence, ABC):
+    # Whether the attribute is required, i.e. must be present.
     required: ClassVar[bool] = False
+    # The name of the class instance that should store the token's parsed value.
     property_name: ClassVar[str] = NotImplemented
 
     @property

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional, List
-from contextlib import suppress
+from typing import Optional, List, ClassVar
 
 from spnego.negotiation_tokens.base import SPNEGONegotiationToken, register_spnego_class
 from spnego.token_attributes import MechListMic, ResponseToken, SupportedMech, NegTokenRespNegState, NegState, MechType
@@ -19,17 +18,23 @@ class NegTokenResp(SPNEGONegotiationToken):
     response_token: Optional[bytes] = None
     mech_list_mic: Optional[bytes] = None
 
+    spnego_tag: ClassVar[Tag] = Tag.from_bytes(data=b'\xa1')
+
     class _NegState(NegState):
         tag = Tag.from_bytes(data=b'\xa0')
+        property_name = 'neg_state'
 
     class _SupportedMech(SupportedMech):
         tag = Tag.from_bytes(data=b'\xa1')
+        property_name = 'supported_mech'
 
     class _ResponseToken(ResponseToken):
         tag = Tag.from_bytes(data=b'\xa2')
+        property_name = 'response_token'
 
     class _MechListMic(MechListMic):
         tag = Tag.from_bytes(data=b'\xa3')
+        property_name = 'mech_list_mic'
 
     @property
     def _inner_sequence(self) -> ASN1Sequence:
@@ -65,25 +70,3 @@ class NegTokenResp(SPNEGONegotiationToken):
             )
 
         return ASN1Sequence(elements=tuple(inner_elements))
-
-    @classmethod
-    def _from_inner_sequence(cls, inner_sequence: ASN1Sequence) -> NegTokenResp:
-
-        neg_state: Optional[NegTokenRespNegState] = None
-        with suppress(StopIteration):
-            neg_state: Optional[NegTokenRespNegState] = cls._NegState.from_tlv_triplet(
-                tlv_triplet=next(
-                    element
-                    for element in inner_sequence.elements if element.tag == cls._NegState.tag
-                )
-            ).parsed_value
-
-        mech_token: Optional[bytes] = None
-        with suppress(StopIteration):
-
-
-
-
-
-
-        pass

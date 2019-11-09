@@ -55,14 +55,6 @@ class MissingRequiredAttributesError(MalformedNegotiationTokenError):
         self.required_tags: Set[Tag] = set(required_tags)
 
 
-class NegotiationTokenTagMismatchError(MalformedNegotiationTokenError):
-    def __init__(self, observed_tag: Tag):
-        super().__init__(
-            f"The provided tag's value ({observed_tag}) does not match the requested negotiation token's tag's value."
-        )
-        self.observed_tag: Tag = observed_tag
-
-
 class NegotiationTokenOidMismatchError(MalformedNegotiationTokenError):
     def __init__(self, observed_oid: OID):
         super().__init__(

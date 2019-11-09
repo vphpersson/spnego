@@ -1,18 +1,19 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import ClassVar, Type, Dict, Iterable, Set, Optional, Any
+from typing import ClassVar, Type, Dict, Iterable, Set, Optional, Any, List
 from abc import ABC, abstractmethod
 from inspect import getmembers, isclass
 
 from spnego.token_attributes import TokenAttribute
 from spnego.exceptions import OutOfOrderNegotiationTokenElementError, InvalidAttributeTagError, \
     MultipleAttributeError, InvalidGSSTokenTagError, InvalidNumberOfGSSTokenElementsError, \
-    MissingRequiredAttributesError, NegotiationTokenTagMismatchError, NegotiationTokenOidMismatchError
+    MissingRequiredAttributesError, NegotiationTokenOidMismatchError
 
 from asn1.asn1_type import ASN1Type
 from asn1.universal_types import ASN1UniversalTag,  Sequence as ASN1Sequence, ObjectIdentifier
 from asn1.oid import OID
 from asn1.tag_length_value_triplet import Tag, TagLengthValueTriplet
+from asn1.utils import extract_elements
 
 
 @dataclass
@@ -26,18 +27,20 @@ class GSSToken(ASN1Type, ABC):
         raise NotImplementedError
 
     @classmethod
-    @abstractmethod
-    def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet) -> ASN1Sequence:
-        sequence = ASN1Sequence._from_tlv_triplet(tlv_triplet=tlv_triplet)
+    def extract_negotiate_token_sequence(cls, gss_token_tlv_triplet: TagLengthValueTriplet) -> ASN1Sequence:
+        gss_token_elements: List[TagLengthValueTriplet] = extract_elements(elements_data=gss_token_tlv_triplet.value)
 
-        if len(sequence.elements) != 2:
-            raise InvalidNumberOfGSSTokenElementsError(num_observed_elements=len(sequence.elements))
+        if len(gss_token_elements) != 2:
+            raise InvalidNumberOfGSSTokenElementsError(num_observed_elements=len(gss_token_elements))
 
-        if sequence.elements[0].tag != ASN1UniversalTag.OBJECT_IDENTIFIER.value:
-            raise InvalidGSSTokenTagError(observed_tag=sequence.elements[0].tag)
+        if gss_token_elements[0].tag != ASN1UniversalTag.OBJECT_IDENTIFIER.value:
+            raise InvalidGSSTokenTagError(observed_tag=gss_token_elements[0].tag)
 
-        # TODO: It is strange that a sequence is returned, having an incorrect tag value.
-        return sequence
+        observed_mechanism_oid: OID = ObjectIdentifier.from_tlv_triplet(tlv_triplet=gss_token_elements[0]).oid
+        if observed_mechanism_oid != cls.mechanism_oid:
+            raise NegotiationTokenOidMismatchError(observed_oid=observed_mechanism_oid)
+
+        return ASN1Sequence.from_bytes(data=gss_token_elements[1].value)
 
     def tlv_triplet(self) -> TagLengthValueTriplet:
         return TagLengthValueTriplet(
@@ -46,81 +49,17 @@ class GSSToken(ASN1Type, ABC):
         )
 
 
-@dataclass
-class SPNEGONegotiationToken(GSSToken, ABC):
-    mechanism_oid: ClassVar[OID] = OID.from_string('1.3.6.1.5.5.2')
-    spnego_tag: ClassVar[Tag] = NotImplemented
-    _spnego_tag_to_class: ClassVar[Dict[Tag, Type[SPNEGONegotiationToken]]] = {}
+class ASN1AttributeParserMixin:
 
-    @property
-    @abstractmethod
-    def _inner_sequence(self) -> ASN1Sequence:
-        raise NotImplementedError
-
-    @property
-    def negotiation_token_tlv_triplet(self) -> TagLengthValueTriplet:
-        return TagLengthValueTriplet(tag=self.spnego_tag, value=bytes(self._inner_sequence))
-
-    @classmethod
-    def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet):
-        """
-        Instantiate a negotiate token from a TLV triplet.
-
-        This method is called via the `ASN1Type.from_tlv_triplet` method. If it is called with this class, i.e.
-        `SPNEGONegotiationToken.from_tlv_triplet`, this method will instantiate a negotiation token of the appropriate
-        class by looking up the class with the provided TLV triplet's tag. If it is called with a child class, e.g.
-        `NegTokenInit.from_tlv_triplet`, the appropriate class is chosen via the `cls` argument.
-
-        If the method is called with a child class, a check is made to assure that the provided TLV triplet is of the
-        correct format by comparing the TLV triplets tag with the chosen `cls` class' `spnego_tag`.
-
-        The `_spnego_tag_to_class` dict is populated via a class decorator that registers the corresponding class'
-        tag and class as key and value.
-
-        :param tlv_triplet: A TLV triplet corresponding to a negotiation token.
-        :return: An instance of the negotiate token class corresponding to the TLV triplet's tag.
-        """
-
-        # Import the negotiate token classes to enable the population of the `_spnego_tag_to_class` dict.
-        from spnego.negotiation_tokens.neg_token_init import NegTokenInit
-        from spnego.negotiation_tokens.neg_token_resp import NegTokenResp
-
-        # Verify that the GSS token part is conformant.
-
-        gss_token_sequence: ASN1Sequence = super()._from_tlv_triplet(tlv_triplet=tlv_triplet)
-        observed_mechanism_oid: OID = ObjectIdentifier.from_tlv_triplet(tlv_triplet=gss_token_sequence.elements[0]).oid
-
-        if observed_mechanism_oid != cls.mechanism_oid:
-            raise NegotiationTokenOidMismatchError(observed_oid=observed_mechanism_oid)
-
-        # Instantiate a negotiation token instance.
-
-        negotiation_token_tlv_triplet: TagLengthValueTriplet = gss_token_sequence.elements[1]
-        inner_sequence = ASN1Sequence.from_tlv_triplet(
-            tlv_triplet=TagLengthValueTriplet.from_bytes(data=negotiation_token_tlv_triplet.value)
-        )
-
-        if cls != SPNEGONegotiationToken:
-            if cls.spnego_tag != negotiation_token_tlv_triplet.tag:
-                raise NegotiationTokenTagMismatchError(observed_tag=negotiation_token_tlv_triplet.tag)
-            return cls._parse_attribute_elements(token_inner_elements=inner_sequence.elements)
-        else:
-            return cls._spnego_tag_to_class[negotiation_token_tlv_triplet.tag]._parse_attribute_elements(
-                token_inner_elements=inner_sequence.elements
-            )
-
+    # TODO: How should i type hint `cls` and the return value?
     @classmethod
     def _parse_attribute_elements(cls, token_inner_elements: Iterable[TagLengthValueTriplet]):
         """
-        Instantiate a negotiate token class from a collection of attribute elements (TLV triplets).
+        Instantiate a ASN.1 Sequence-like class from a collection of attribute elements (TLV triplets).
 
-        :param token_inner_elements: The elements (TLV triplets) of a negotiate token's ASN.1 Sequence that
-            constitute the negotiate token's attributes.
+        :param token_inner_elements: The elements (TLV triplets) that constitute the instance's attributes.
         :return: An instance of the negotiate token class corresponding to the cls argument.
         """
-
-        if cls == SPNEGONegotiationToken:
-            raise ValueError(f'The calling class must be a child class.')
 
         tag_to_attribute_class: Dict[Tag, Type[TokenAttribute]] = {
             attribute_class.tag: attribute_class
@@ -165,8 +104,3 @@ class SPNEGONegotiationToken(GSSToken, ABC):
             tag_to_attribute_class[tag].property_name: parsed_value
             for tag, parsed_value in tag_to_parsed_value.items()
         })
-
-
-def register_spnego_class(cls: Type[SPNEGONegotiationToken]) -> Type[SPNEGONegotiationToken]:
-    cls._spnego_tag_to_class[cls.spnego_tag] = cls
-    return cls

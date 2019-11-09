@@ -6,7 +6,7 @@ from spnego.negotiation_tokens.base import ASN1AttributeParserMixin
 from spnego.token_attributes import MechListMic, ResponseToken, SupportedMech, NegTokenRespNegState, NegState, MechType
 
 from asn1.asn1_type import ASN1Type
-from asn1.universal_types import Enumerated, OctetString, Sequence
+from asn1.universal_types import Enumerated, OctetString, Sequence as ASN1Sequence
 from asn1.tag_length_value_triplet import Tag, TagLengthValueTriplet
 from asn1.oid import OID
 from asn1.utils import extract_elements
@@ -40,7 +40,9 @@ class NegTokenResp(ASN1Type, ASN1AttributeParserMixin):
 
     @classmethod
     def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet) -> NegTokenResp:
-        return cls._parse_attribute_elements(token_inner_elements=Sequence.from_bytes(data=tlv_triplet.value).elements)
+        return cls._parse_attribute_elements(
+            token_inner_elements=ASN1Sequence.from_bytes(data=tlv_triplet.value).elements
+        )
 
     def tlv_triplet(self) -> TagLengthValueTriplet:
 
@@ -76,6 +78,6 @@ class NegTokenResp(ASN1Type, ASN1AttributeParserMixin):
 
         return TagLengthValueTriplet(
             tag=self.tag,
-            value=b''.join(bytes(element) for element in elements)
+            value=bytes(ASN1Sequence(elements=tuple(elements)))
         )
 

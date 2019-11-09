@@ -2,22 +2,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar, List, Optional
 
-from spnego.negotiation_tokens.base import SPNEGONegotiationToken, register_spnego_class
+from spnego.negotiation_tokens.base import GSSToken, ASN1AttributeParserMixin
 from spnego.token_attributes import MechTypeList, ReqFlags, MechToken, MechListMic, NegTokenInitReqFlag
 
-from asn1.universal_types import Sequence as ASN1Sequence, OctetString, ObjectIdentifier, BitString
+from asn1.universal_types import Sequence as ASN1Sequence, SequenceOf, OctetString, ObjectIdentifier, BitString
 from asn1.tag_length_value_triplet import Tag, TagLengthValueTriplet
 from asn1.oid import OID
 
 
 @dataclass
-@register_spnego_class
-class NegTokenInit(SPNEGONegotiationToken):
+class NegTokenInit(GSSToken, ASN1AttributeParserMixin):
     mech_types: List[OID]
     req_flags: Optional[NegTokenInitReqFlag] = None
     mech_token: Optional[bytes] = None
     mech_list_mic: Optional[bytes] = None
 
+    mechanism_oid: ClassVar[OID] = OID.from_string('1.3.6.1.5.5.2')
     spnego_tag: ClassVar[Tag] = Tag.from_bytes(data=b'\xa0')
 
     class _MechTypeList(MechTypeList):
@@ -37,13 +37,18 @@ class NegTokenInit(SPNEGONegotiationToken):
         tag = Tag.from_bytes(data=b'\xa3')
         property_name = 'mech_list_mic'
 
+    @classmethod
+    def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet) -> NegTokenInit:
+        negotiate_token_sequence: ASN1Sequence = cls.extract_negotiate_token_sequence(gss_token_tlv_triplet=tlv_triplet)
+        return cls._parse_attribute_elements(token_inner_elements=negotiate_token_sequence.elements)
+
     @property
-    def _inner_sequence(self) -> ASN1Sequence:
+    def negotiation_token_tlv_triplet(self) -> TagLengthValueTriplet:
 
         inner_elements: List[TagLengthValueTriplet] = [
             self._MechTypeList(
                 elements=(
-                    ASN1Sequence(
+                    SequenceOf(
                         elements=tuple(ObjectIdentifier(oid=oid).tlv_triplet() for oid in self.mech_types)
                     ).tlv_triplet(),
                 )
@@ -65,5 +70,5 @@ class NegTokenInit(SPNEGONegotiationToken):
                 self._MechListMic(elements=(OctetString(data=self.mech_list_mic).tlv_triplet(),)).tlv_triplet()
             )
 
-        return ASN1Sequence(elements=tuple(inner_elements))
+        return ASN1Sequence(elements=tuple(inner_elements)).tlv_triplet()
 

@@ -2,23 +2,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, List, ClassVar
 
-from spnego.negotiation_tokens.base import SPNEGONegotiationToken, register_spnego_class
+from spnego.negotiation_tokens.base import ASN1AttributeParserMixin
 from spnego.token_attributes import MechListMic, ResponseToken, SupportedMech, NegTokenRespNegState, NegState, MechType
 
-from asn1.universal_types import Sequence as ASN1Sequence, Enumerated, OctetString
+from asn1.asn1_type import ASN1Type
+from asn1.universal_types import Enumerated, OctetString, Sequence
 from asn1.tag_length_value_triplet import Tag, TagLengthValueTriplet
 from asn1.oid import OID
+from asn1.utils import extract_elements
 
 
 @dataclass
-@register_spnego_class
-class NegTokenResp(SPNEGONegotiationToken):
+class NegTokenResp(ASN1Type, ASN1AttributeParserMixin):
     neg_state: Optional[NegTokenRespNegState] = None
     supported_mech: Optional[OID] = None
     response_token: Optional[bytes] = None
     mech_list_mic: Optional[bytes] = None
 
     spnego_tag: ClassVar[Tag] = Tag.from_bytes(data=b'\xa1')
+    tag: ClassVar[Tag] = spnego_tag
 
     class _NegState(NegState):
         tag = Tag.from_bytes(data=b'\xa0')
@@ -36,37 +38,44 @@ class NegTokenResp(SPNEGONegotiationToken):
         tag = Tag.from_bytes(data=b'\xa3')
         property_name = 'mech_list_mic'
 
-    @property
-    def _inner_sequence(self) -> ASN1Sequence:
+    @classmethod
+    def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet) -> NegTokenResp:
+        return cls._parse_attribute_elements(token_inner_elements=Sequence.from_bytes(data=tlv_triplet.value).elements)
 
-        inner_elements: List[TagLengthValueTriplet] = []
+    def tlv_triplet(self) -> TagLengthValueTriplet:
+
+        elements: List[TagLengthValueTriplet] = []
 
         if self.neg_state is not None:
-            inner_elements.append(
+            elements.append(
                 self._NegState(
                     elements=(Enumerated(int_value=self.neg_state.value).tlv_triplet(),)
                 ).tlv_triplet()
             )
 
         if self.supported_mech is not None:
-            inner_elements.append(
+            elements.append(
                 self._SupportedMech(
                     elements=(MechType(oid=self.supported_mech).tlv_triplet(),),
                 ).tlv_triplet()
             )
 
         if self.response_token is not None:
-            inner_elements.append(
+            elements.append(
                 self._ResponseToken(
                     elements=(OctetString(data=self.response_token).tlv_triplet(),)
                 ).tlv_triplet()
             )
 
         if self.mech_list_mic is not None:
-            inner_elements.append(
+            elements.append(
                 self._MechListMic(
                     elements=(OctetString(data=self.mech_list_mic).tlv_triplet(),)
                 ).tlv_triplet()
             )
 
-        return ASN1Sequence(elements=tuple(inner_elements))
+        return TagLengthValueTriplet(
+            tag=self.tag,
+            value=b''.join(bytes(element) for element in elements)
+        )
+

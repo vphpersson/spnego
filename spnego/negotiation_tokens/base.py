@@ -27,7 +27,7 @@ class GSSToken(ASN1Type, ABC):
         raise NotImplementedError
 
     @classmethod
-    def extract_negotiate_token_sequence(cls, gss_token_tlv_triplet: TagLengthValueTriplet) -> ASN1Sequence:
+    def extract_negotiate_token_tlv_triplet(cls, gss_token_tlv_triplet: TagLengthValueTriplet) -> TagLengthValueTriplet:
         gss_token_elements: List[TagLengthValueTriplet] = extract_elements(elements_data=gss_token_tlv_triplet.value)
 
         if len(gss_token_elements) != 2:
@@ -40,7 +40,7 @@ class GSSToken(ASN1Type, ABC):
         if observed_mechanism_oid != cls.mechanism_oid:
             raise NegotiationTokenOidMismatchError(observed_oid=observed_mechanism_oid)
 
-        return ASN1Sequence.from_bytes(data=gss_token_elements[1].value)
+        return gss_token_elements[1]
 
     def tlv_triplet(self) -> TagLengthValueTriplet:
         return TagLengthValueTriplet(

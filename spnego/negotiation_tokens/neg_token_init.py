@@ -39,8 +39,17 @@ class NegTokenInit(GSSToken, ASN1AttributeParserMixin):
 
     @classmethod
     def _from_tlv_triplet(cls, tlv_triplet: TagLengthValueTriplet) -> NegTokenInit:
-        negotiate_token_sequence: ASN1Sequence = cls.extract_negotiate_token_sequence(gss_token_tlv_triplet=tlv_triplet)
-        return cls._parse_attribute_elements(token_inner_elements=negotiate_token_sequence.elements)
+
+        negotiate_token_tlv_triplet: TagLengthValueTriplet = cls.extract_negotiate_token_tlv_triplet(
+            gss_token_tlv_triplet=tlv_triplet
+        )
+        if negotiate_token_tlv_triplet.tag != cls.spnego_tag:
+            # TODO: Use proper exception.
+            raise ValueError
+
+        return cls._parse_attribute_elements(
+            token_inner_elements=ASN1Sequence.from_bytes(data=negotiate_token_tlv_triplet.value).elements
+        )
 
     @property
     def negotiation_token_tlv_triplet(self) -> TagLengthValueTriplet:
@@ -70,5 +79,7 @@ class NegTokenInit(GSSToken, ASN1AttributeParserMixin):
                 self._MechListMic(elements=(OctetString(data=self.mech_list_mic).tlv_triplet(),)).tlv_triplet()
             )
 
-        return ASN1Sequence(elements=tuple(inner_elements)).tlv_triplet()
-
+        return TagLengthValueTriplet(
+            tag=self.spnego_tag,
+            value=bytes(ASN1Sequence(elements=tuple(inner_elements)))
+        )

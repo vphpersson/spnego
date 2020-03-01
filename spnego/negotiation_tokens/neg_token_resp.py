@@ -2,14 +2,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, List, ClassVar
 
-from spnego.negotiation_tokens.base import ASN1AttributeParserMixin
+from spnego.negotiation_tokens import ASN1AttributeParserMixin
 from spnego.token_attributes import MechListMic, ResponseToken, SupportedMech, NegTokenRespNegState, NegState, MechType
 
 from asn1.asn1_type import ASN1Type
 from asn1.universal_types import Enumerated, OctetString, Sequence as ASN1Sequence
 from asn1.tag_length_value_triplet import Tag, TagLengthValueTriplet
 from asn1.oid import OID
-from asn1.utils import extract_elements
 
 
 @dataclass

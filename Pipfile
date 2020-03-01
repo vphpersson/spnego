@@ -6,7 +6,7 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-asn1 = {git = "https://github.com/vphpersson/asn1"}
+asn1 = {file = "https://github.com/vphpersson/asn1/tarball/master"}
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"

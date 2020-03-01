@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar, List, Optional
 
-from spnego.negotiation_tokens.base import GSSToken, ASN1AttributeParserMixin
+from spnego.negotiation_tokens import GSSToken, ASN1AttributeParserMixin
 from spnego.token_attributes import MechTypeList, ReqFlags, MechToken, MechListMic, NegTokenInitReqFlag
 
 from asn1.universal_types import Sequence as ASN1Sequence, SequenceOf, OctetString, ObjectIdentifier, BitString

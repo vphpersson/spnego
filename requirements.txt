@@ -1,0 +1,1 @@
+-e git+ssh://git@github.com/vphpersson/asn1.git#egg=asn1
